@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmojiKit - Browser</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Load Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Load Noto Color Emoji to fix missing OS emojis -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap" rel="stylesheet">
+  <style>
+    /* Custom Scrollbar for a neat UI */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 20px;
+    }
+    .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+      background-color: #94a3b8;
+    }
+
+    /* Animation for the Toast */
+    .toast-enter {
+      transform: translate(-50%, 0) scale(1);
+      opacity: 1;
+    }
+    .toast-exit {
+      transform: translate(-50%, 2rem) scale(0.95);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Hide empty categories during search */
+    .category-section.hidden {
+      display: none;
+    }
+    .emoji-btn.hidden {
+      display: none;
+    }
+
+    /* Force Emoji Fonts to prevent missing character boxes */
+    .emoji-text {
+      font-family: 'Noto Color Emoji', "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans selection:bg-blue-500/30">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+      
+      <!-- Logo -->
+      <div class="flex items-center gap-3 shrink-0">
+        <div class="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-inner shadow-blue-400/20 text-white font-bold text-xl">
+          ✨
+        </div>
+        <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-100 to-slate-400 hidden sm:block">
+          EmojiKit
+        </h1>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="flex-1 max-w-2xl relative group">
+        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-blue-500 transition-colors">
+          <i data-lucide="search" class="w-5 h-5"></i>
+        </div>
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="Search for an emoji..."
+          class="block w-full pl-11 pr-10 py-3 border border-slate-700 rounded-2xl leading-5 bg-slate-800/50 placeholder-slate-500 focus:outline-none focus:bg-slate-800 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all shadow-sm sm:text-base text-slate-100"
+        />
+        <button id="clearSearch" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 hover:text-slate-300 transition-colors hidden">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-start gap-8 py-8">
+    
+    <!-- Sidebar / Navigation -->
+    <aside class="hidden lg:block w-64 shrink-0 sticky top-28 h-[calc(100vh-8rem)] overflow-y-auto pb-8 pr-4 custom-scrollbar">
+      <nav id="sidebarNav" class="space-y-1.5">
+        <!-- Categories will be injected here -->
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 min-w-0 pb-20">
+      
+      <!-- Loading State -->
+      <div id="loadingState" class="flex flex-col items-center justify-center py-32 text-center">
+        <i data-lucide="loader-2" class="w-10 h-10 animate-spin text-blue-500 mb-4"></i>
+        <h3 class="text-xl font-medium text-slate-300">Loading emoji library...</h3>
+        <p class="text-sm text-slate-500 mt-2">Make sure you are running a local server to fetch the JSON.</p>
+      </div>
+
+      <!-- Empty Search State -->
+      <div id="emptyState" class="hidden flex-col items-center justify-center py-32 text-center px-4">
+        <div class="text-6xl mb-6">🕵️‍♂️</div>
+        <h3 class="text-2xl font-bold text-slate-100 mb-2">No emojis found</h3>
+        <p class="text-slate-400 max-w-sm">We couldn't find any emojis matching your search. Try a different term!</p>
+      </div>
+
+      <!-- Emoji Grid Container -->
+      <div id="emojiContainer" class="space-y-12 hidden">
+        <!-- Emojis will be injected here -->
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast-exit fixed bottom-8 left-1/2 flex items-center gap-3 px-5 py-3 bg-slate-900/95 backdrop-blur-md text-white rounded-full shadow-2xl z-50 transition-all duration-300 ease-out border border-slate-700/50">
+    <div class="bg-emerald-500/20 text-emerald-400 p-1.5 rounded-full">
+      <i data-lucide="check" class="w-4 h-4 stroke-[3]"></i>
+    </div>
+    <span id="toastMessage" class="font-medium text-sm sm:text-base"></span>
+  </div>
+
+  <script>
+    // Map standard unicode categories to lucide icon names
+    const iconMap = {
+      'smileys-emotion': 'smile',
+      'people-body': 'user',
+      'animals-nature': 'cat',
+      'food-drink': 'coffee',
+      'travel-places': 'plane',
+      'activities': 'activity',
+      'objects': 'lightbulb',
+      'symbols': 'hash',
+      'flags': 'flag'
+    };
+
+    let emojiData = [];
+    let toastTimeout;
+
+    // DOM Elements
+    const emojiContainer = document.getElementById('emojiContainer');
+    const sidebarNav = document.getElementById('sidebarNav');
+    const loadingState = document.getElementById('loadingState');
+    const emptyState = document.getElementById('emptyState');
+    const searchInput = document.getElementById('searchInput');
+    const clearSearchBtn = document.getElementById('clearSearch');
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toastMessage');
+
+    async function init() {
+      try {
+        // Fetch the generated JSON file
+        const response = await fetch('emoji_data.json');
+        if (!response.ok) throw new Error('Network response was not ok');
+        
+        emojiData = await response.json();
+        
+        renderApp();
+        setupSearch();
+        setupScrollSpy();
+        
+        // Hide loading, show content
+        loadingState.classList.add('hidden');
+        emojiContainer.classList.remove('hidden');
+        
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+      } catch (error) {
+        loadingState.innerHTML = `
+          <div class="text-6xl mb-4">⚠️</div>
+          <h3 class="text-xl font-bold text-red-500 mb-2">Failed to load emoji data</h3>
+          <p class="text-slate-500">Ensure <code class="bg-slate-200 px-1 rounded">emoji_data.json</code> is in the same directory and you are running a local web server.</p>
+        `;
+        console.error("Error loading JSON:", error);
+      }
+    }
+
+    function renderApp() {
+      let sidebarHTML = '';
+      let mainHTML = '';
+
+      emojiData.forEach((category) => {
+        const iconName = iconMap[category.id] || 'circle';
+
+        // 1. Build Sidebar Link
+        sidebarHTML += `
+          <a href="#category-${category.id}" data-target="${category.id}" class="nav-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800/50 hover:shadow-sm border border-transparent group">
+            <div class="p-1.5 rounded-lg transition-colors bg-slate-800 group-hover:bg-slate-700 icon-container">
+              <i data-lucide="${iconName}" class="w-[18px] h-[18px] text-slate-400"></i>
+            </div>
+            <span>${category.name}</span>
+            <div class="active-dot hidden ml-auto w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+          </a>
+        `;
+
+        // 2. Build Category Section
+        let emojisHTML = category.emojis.map(emoji => `
+          <button 
+            onclick="copyEmoji('${emoji.char}')" 
+            title="${emoji.name}"
+            data-name="${emoji.name.toLowerCase()}"
+            class="emoji-btn group relative aspect-square flex items-center justify-center text-4xl sm:text-5xl bg-slate-800 rounded-2xl border border-slate-700/60 shadow-sm hover:shadow-lg hover:border-blue-500 hover:-translate-y-1 hover:scale-105 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+          >
+            <span class="emoji-text transform transition-transform group-active:scale-90 duration-100">
+              ${emoji.char}
+            </span>
+          </button>
+        `).join('');
+
+        mainHTML += `
+          <section id="category-${category.id}" class="category-section scroll-mt-28">
+            <div class="flex items-center gap-3 mb-6 sticky top-20 bg-slate-900/90 backdrop-blur py-4 z-10 border-b border-slate-800/60">
+              <div class="p-2 bg-slate-800 rounded-xl shadow-sm border border-slate-700/60 text-slate-300">
+                <i data-lucide="${iconName}" class="w-5 h-5"></i>
+              </div>
+              <h2 class="text-xl font-bold text-slate-100">${category.name}</h2>
+              <span class="emoji-count ml-2 text-sm font-medium text-slate-400 bg-slate-800 px-2.5 py-0.5 rounded-full">
+                ${category.emojis.length}
+              </span>
+            </div>
+            <div class="emoji-grid grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3 sm:gap-4">
+              ${emojisHTML}
+            </div>
+          </section>
+        `;
+      });
+
+      sidebarNav.innerHTML = sidebarHTML;
+      emojiContainer.innerHTML = mainHTML;
+      
+      // Set the first item as active initially
+      updateSidebarActiveState(emojiData[0].id);
+    }
+
+    function setupSearch() {
+      searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        
+        // Show/Hide clear button
+        if (query) clearSearchBtn.classList.remove('hidden');
+        else clearSearchBtn.classList.add('hidden');
+
+        let totalVisible = 0;
+        const sections = document.querySelectorAll('.category-section');
+
+        sections.forEach(section => {
+          const buttons = section.querySelectorAll('.emoji-btn');
+          let visibleInCategory = 0;
+
+          buttons.forEach(btn => {
+            const name = btn.getAttribute('data-name');
+            if (name.includes(query)) {
+              btn.classList.remove('hidden');
+              visibleInCategory++;
+              totalVisible++;
+            } else {
+              btn.classList.add('hidden');
+            }
+          });
+
+          // Update count badge
+          section.querySelector('.emoji-count').textContent = visibleInCategory;
+
+          // Hide entire section if no matches
+          if (visibleInCategory === 0) {
+            section.classList.add('hidden');
+          } else {
+            section.classList.remove('hidden');
+          }
+        });
+
+        // Show empty state if nothing found
+        if (totalVisible === 0 && query !== '') {
+          emptyState.classList.remove('hidden');
+          emojiContainer.classList.add('hidden');
+        } else {
+          emptyState.classList.add('hidden');
+          emojiContainer.classList.remove('hidden');
+        }
+      });
+
+      clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        searchInput.dispatchEvent(new Event('input')); // Trigger update
+        searchInput.focus();
+      });
+    }
+
+    // Scroll Spy: Highlight sidebar based on scrolling
+    function setupScrollSpy() {
+      window.addEventListener('scroll', () => {
+        // Disable scroll spy while searching
+        if (searchInput.value.trim() !== '') return;
+
+        let currentActive = '';
+        const sections = document.querySelectorAll('.category-section');
+        
+        sections.forEach(section => {
+          const sectionTop = section.getBoundingClientRect().top;
+          // If the section top is near the top of viewport
+          if (sectionTop <= 150) {
+            currentActive = section.id.replace('category-', '');
+          }
+        });
+
+        if (currentActive) {
+          updateSidebarActiveState(currentActive);
+        }
+      });
+    }
+
+    function updateSidebarActiveState(activeId) {
+      document.querySelectorAll('.nav-link').forEach(link => {
+        const target = link.getAttribute('data-target');
+        const iconContainer = link.querySelector('.icon-container');
+        const icon = link.querySelector('i');
+        const dot = link.querySelector('.active-dot');
+
+        if (target === activeId) {
+          link.classList.add('bg-slate-800', 'text-blue-400', 'shadow-sm', 'border-slate-700', 'ring-1', 'ring-blue-500/20');
+          link.classList.remove('border-transparent', 'hover:bg-slate-800/50');
+          iconContainer.classList.add('bg-blue-900/30');
+          iconContainer.classList.remove('bg-slate-800', 'group-hover:bg-slate-700');
+          icon.classList.replace('text-slate-400', 'text-blue-400');
+          dot.classList.remove('hidden');
+        } else {
+          link.classList.remove('bg-slate-800', 'text-blue-400', 'shadow-sm', 'border-slate-700', 'ring-1', 'ring-blue-500/20');
+          link.classList.add('border-transparent', 'hover:bg-slate-800/50');
+          iconContainer.classList.remove('bg-blue-900/30');
+          iconContainer.classList.add('bg-slate-800', 'group-hover:bg-slate-700');
+          icon.classList.replace('text-blue-400', 'text-slate-400');
+          dot.classList.add('hidden');
+        }
+      });
+    }
+
+    async function copyEmoji(char) {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(char);
+          showToast(`Copied ${char} to clipboard!`);
+        } else {
+          fallbackCopy(char);
+        }
+      } catch (err) {
+        fallbackCopy(char);
+      }
+    }
+
+    function fallbackCopy(text) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) showToast(`Copied ${text} to clipboard!`);
+      } catch (err) {
+        console.error('Fallback copy failed', err);
+      }
+      document.body.removeChild(textArea);
+    }
+
+    function showToast(message) {
+      toastMessage.textContent = message;
+      toast.classList.remove('toast-exit');
+      toast.classList.add('toast-enter');
+
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('toast-enter');
+        toast.classList.add('toast-exit');
+      }, 2500);
+    }
+
+    // Start App
+    init();
+  </script>
+</body>
+</html>
