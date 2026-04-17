@@ -1,6 +1,6 @@
-✨ EmojiKit - A Polished Emoji Browser
+✨ OpenEmoji - A Polished Emoji Browser
 
-EmojiKit is a lightweight, open-source emoji browser built for speed and visual clarity. It features a custom-built compiler that generates a local emoji database from official Unicode registries, ensuring you always have the most up-to-date icons without bloating your frontend bundle.
+OpenEmoji is a lightweight, open-source emoji browser built for speed and visual clarity. It features a custom-built compiler that generates a local emoji database from official Unicode registries, ensuring you always have the most up-to-date icons without bloating your frontend bundle.
 
 🚀 Features
 
@@ -29,10 +29,6 @@ Fonts: Google Noto Color Emoji.
 📥 Getting Started
 
 1. Clone the repository
-
-git clone [https://github.com/your-username/emojikit.git](https://github.com/your-username/emojikit.git)
-cd emojikit
-
 
 2. Generate the Emoji Library
 
@@ -85,4 +81,4 @@ Open a Pull Request.
 
 Distributed under the MIT License. See LICENSE for more information.
 
-Built with ✨ by [Your Name/Handle]
+Built with Gemini
