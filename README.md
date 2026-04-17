@@ -2,6 +2,10 @@
 
 OpenEmoji is a lightweight, open-source emoji browser built for speed and visual clarity. It features a custom-built compiler that generates a local emoji database from official Unicode registries, ensuring you always have the most up-to-date icons without bloating your frontend bundle.
 
+😎 Try it now
+
+https://madeinnewyork87.github.io/OpenEmoji/OpenEmoji.html
+
 🚀 Features
 
 Full Library Compiler: A Node.js script that fetches thousands of emojis and groups them into clean, high-level categories.
